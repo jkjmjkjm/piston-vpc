@@ -27,7 +27,7 @@ services:
       - ./htpasswd:/etc/nginx/.htpasswd:ro  # User credentials
       - ./htpasswdadmin:/etc/nginx/.htpasswd_admin:ro  # Admin credentials
       - ./certbot/www:/var/www/certbot/:ro
-      - ./certbot/conf/:/etc/nginx/ssl/:ro
+      - /etc/letsencrypt:/etc/nginx/ssl/:ro
     depends_on:
       - piston-api
     networks:
