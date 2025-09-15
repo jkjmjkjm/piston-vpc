@@ -1,5 +1,5 @@
----
-version: "3.2"
+version: "3.8"
+
 services:
   piston-api:
     image: ghcr.io/engineer-man/piston
@@ -15,29 +15,45 @@ services:
       - PISTON_RUN_TIMEOUT=-1
     networks:
       - piston-net
+
   nginx-proxy:
-    image: nginx:latest
+    image: nginx:stable
     container_name: nginx-proxy
     restart: always
     ports:
-      - "443:443"
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./htpasswd:/etc/nginx/.htpasswd:ro  # User credentials
-      - ./htpasswdadmin:/etc/nginx/.htpasswd_admin:ro  # Admin credentials
-      - ./certbot/www:/var/www/certbot/:ro
-      - ./certbot/conf/:/etc/nginx/ssl/:ro
+      - ./htpasswd:/etc/nginx/.htpasswd:ro
+      - ./htpasswdadmin:/etc/nginx/.htpasswd_admin:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
     depends_on:
       - piston-api
+      - pyshell
     networks:
       - piston-net
       - pyshell-net
+
   certbot:
     image: certbot/certbot:latest
+    container_name: certbot
+    restart: unless-stopped
+    entrypoint: >
+      sh -c "trap exit TERM; while :; do
+        certbot renew --webroot -w /var/www/certbot --quiet &&
+        docker kill -s HUP nginx-proxy;
+        sleep 12h & wait $${!};
+      done"
     volumes:
-      - ./certbot/www/:/var/www/certbot/:rw
-      - ./certbot/conf/:/etc/letsencrypt/:rw
+      - ./certbot/www:/var/www/certbot:rw
+      - ./certbot/conf:/etc/letsencrypt:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - piston-net
+      - pyshell-net
+
   pyshell:
     build: ./pyshell
     container_name: pyshell
@@ -49,6 +65,7 @@ services:
       - docker-network
     volumes:
       - docker-cert-client:/certs/client:ro
+
   docker-runner:
     image: docker:dind
     restart: always
@@ -59,7 +76,7 @@ services:
     volumes:
       - docker-cert-client:/certs/client
       - docker-cert-ca:/certs/ca
-    
+
 networks:
   piston-net:
     driver: bridge
