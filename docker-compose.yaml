@@ -1,0 +1,73 @@
+---
+version: "3.2"
+services:
+  piston-api:
+    image: ghcr.io/engineer-man/piston
+    container_name: piston-api
+    restart: always
+    privileged: true
+    volumes:
+      - ./data/piston/packages:/piston/packages
+    tmpfs:
+      - /tmp:exec
+    environment:
+      - PISTON_OUTPUT_MAX_SIZE=1048576
+      - PISTON_RUN_TIMEOUT=-1
+    networks:
+      - piston-net
+  nginx-proxy:
+    image: nginx:latest
+    container_name: nginx-proxy
+    restart: always
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./htpasswd:/etc/nginx/.htpasswd:ro  # User credentials
+      - ./htpasswdadmin:/etc/nginx/.htpasswd_admin:ro  # Admin credentials
+      - ./certbot/www:/var/www/certbot/:ro
+      - ./certbot/conf/:/etc/nginx/ssl/:ro
+    depends_on:
+      - piston-api
+    networks:
+      - piston-net
+      - pyshell-net
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - ./certbot/www/:/var/www/certbot/:rw
+      - ./certbot/conf/:/etc/letsencrypt/:rw
+  pyshell:
+    build: ./pyshell
+    container_name: pyshell
+    restart: always
+    environment:
+      - GOTTY_PERMIT_ARGUMENTS=true
+    networks:
+      - pyshell-net
+      - docker-network
+    volumes:
+      - docker-cert-client:/certs/client:ro
+  docker-runner:
+    image: docker:dind
+    restart: always
+    privileged: true
+    container_name: docker
+    networks:
+      - docker-network
+    volumes:
+      - docker-cert-client:/certs/client
+      - docker-cert-ca:/certs/ca
+    
+networks:
+  piston-net:
+    driver: bridge
+  pyshell-net:
+    driver: bridge
+    internal: true
+  docker-network:
+
+volumes:
+  docker-cert-client:
+  docker-cert-ca:
