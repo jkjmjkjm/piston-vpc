@@ -33,11 +33,6 @@ services:
     networks:
       - piston-net
       - pyshell-net
-  certbot:
-    image: certbot/certbot:latest
-    volumes:
-      - ./certbot/www/:/var/www/certbot/:rw
-      - ./certbot/conf/:/etc/letsencrypt/:rw
   pyshell:
     build: ./pyshell
     container_name: pyshell
